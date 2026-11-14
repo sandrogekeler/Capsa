@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from capsa.scanner import FileRecord, Kind
+from capsa.thumbnails import image_size
 
 # Words in a texture's file name that say which map it is.
 COLOR_WORDS = {"color", "basecolor", "albedo", "diffuse", "diff", "col"}
@@ -140,8 +141,7 @@ def single_files(records: list[FileRecord]) -> list[Asset]:
 
     assets = []
     for name, record in by_name.items():
-        # An .exr on its own is taken for an HDRI; inside a material it is a map.
-        kind = Kind.HDRI if record.path.suffix.lower() == ".exr" else record.kind
+        kind = Kind.HDRI if is_panorama(record) else record.kind
         shows_itself = kind in (Kind.TEXTURE, Kind.HDRI) and not is_companion(record)
         assets.append(
             Asset(
@@ -153,3 +153,16 @@ def single_files(records: list[FileRecord]) -> list[Asset]:
             )
         )
     return assets
+
+
+def is_panorama(record: FileRecord) -> bool:
+    """Whether an .exr on its own is an HDRI: twice as wide as it is high.
+
+    An equirectangular HDRI is 2:1; a render saved as .exr usually is not. Inside
+    a material an .exr is a map and never gets here. A header OpenImageIO cannot
+    read keeps the old rule: an HDRI.
+    """
+    if record.path.suffix.lower() != ".exr":
+        return False
+    size = image_size(record.path)
+    return size is None or size[0] == 2 * size[1]

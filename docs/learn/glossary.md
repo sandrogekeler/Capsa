@@ -28,6 +28,8 @@ Every technical term used in Capsa, in plain language. Alphabetical.
 
 **Dependency:** code somebody else wrote that Capsa uses, such as pytest. Like a plugin: Capsa does not work without it, and it has its own version.
 
+**Equirectangular:** a whole panorama unrolled into a flat picture, like a world map: 360° across, 180° up and down, so twice as wide as high. The usual layout of an HDRI.
+
 **Enum:** a fixed list of allowed values with names. `Kind` is one: USD, texture, HDRI and so on. A typo such as `Kind.TEXTRUE` fails at once, where a misspelt word in quotes would pass unnoticed.
 
 **Frameless window:** a window without the system's title bar. Capsa draws its own, with the search box and the minimise, maximise and close buttons.

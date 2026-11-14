@@ -39,6 +39,10 @@ The old thumbnail stays in the cache. Nothing clears it yet.
 
 For these, `make_thumbnail` returns `None` and writes one line to the log.
 
+## The size alone
+
+`image_size(path)` opens the file with `oiio.ImageInput`, reads the header and closes it again: width and height, no pixels. Grouping uses it to tell an HDRI from a render ([assets.md](assets.md)).
+
 ## An EXR with several parts
 
 A Karma render can hold several images in one file: beauty, albedo and more. Capsa takes the first. In the render from your machine that is `C`, the beauty.

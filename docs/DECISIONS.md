@@ -130,3 +130,9 @@ One entry per non-obvious choice. Newest at the bottom.
 **Alternatives:** Keep the page-run drag: no Windows-only code, but Windows' settings and Snap do not apply. Answer `WM_NCHITTEST` in the window procedure: Windows would find the borders itself, but WebView2 covers the whole window and receives the mouse first.
 **Trade-off:** Windows-only code that reaches pywebview's Windows Forms window (`window.native`) and needs .NET's `Func` through pythonnet. Microsoft documents the border codes for "a resizable window"; whether Windows resizes a borderless window this way is untested until it runs on Sandro's machine.
 
+## 2026-11-14: A lone .exr is an HDRI only at exactly 2:1
+**Decision:** Grouping reads the width and height of a lone `.exr` from its header (`thumbnails.image_size`) and calls it an HDRI only when the width is exactly twice the height; otherwise a texture. An unreadable header keeps the old rule, HDRI. `.hdr` files stay HDRIs by their ending. A rescan now also rewrites an asset whose kind or cover changed while its files did not (#29).
+**Why:** A render saved as `.exr` was labelled an HDRI. The equirectangular layout HDRIs use is 2:1 by definition, and the header takes about 0.01 s on Sandro's machine (#11). The scanner must not open files, so the test lives in grouping.
+**Alternatives:** A tolerance of a pixel or two: no known HDRI needs it. Reading the header in a step after grouping: a second pass over the assets for the same answer.
+**Trade-off:** Grouping now reads files, so its tests make real `.exr` files. A cropped or non-equirectangular panorama shows as a texture.
+

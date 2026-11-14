@@ -36,9 +36,13 @@ Every asset can have a **cover**, the picture shown on its tile.
 - A texture or HDRI: the file itself.
 - A model, or a lone `.rat`: none yet.
 
-## An assumption to know about
+## HDRI or not: the shape
 
-A lone `.exr` is taken for an HDRI. That is true for your library today, where every `.exr` outside a material is one. A render saved as `.exr` would be mislabelled. The reliable test is the picture's shape (an HDRI is twice as wide as it is high), which needs the file opened. Nothing does that test yet.
+An `.exr` on its own can be an HDRI or a render. Its name does not say which, its shape does: an HDRI in the usual **equirectangular** layout is exactly twice as wide as it is high, like 4096 by 2048. `is_panorama` reads the width and height from the file's header with `image_size` (in `thumbnails.py`), which takes about 0.01 s and leaves the pixels unread. At 2:1 the file is an HDRI, at any other shape a texture.
+
+A header OpenImageIO cannot read keeps the old rule: HDRI.
+
+This is the one place grouping reads a file. The scanner only looks at names and sizes; grouping is where the shape decides.
 
 ## What it does not do yet
 
