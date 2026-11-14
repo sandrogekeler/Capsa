@@ -4,6 +4,7 @@
 
 import { drawDetails } from "./details.js";
 import { openSheet } from "./sheet.js";
+import "./resize.js";
 import { KINDS, askText, button, closeMenu, copyPath, explore, icon, openMenu, say, size, star } from "./ui.js";
 
 // Sidebar groups: [id, label, kinds]. "All" has no kinds and takes everything.
@@ -312,7 +313,10 @@ document.addEventListener("keydown", (event) => {
   }
 });
 document.getElementById("minimize").onclick = () => window.pywebview.api.minimize();
-document.getElementById("maximize").onclick = () => window.pywebview.api.toggle_maximize();
+document.getElementById("maximize").onclick = async () => {
+  const maximized = await window.pywebview.api.toggle_maximize();
+  document.body.classList.toggle("maximized", maximized); // a maximised window has no edges to drag
+};
 document.getElementById("close").onclick = () => window.pywebview.api.close();
 
 window.addEventListener("rescanned", () => {

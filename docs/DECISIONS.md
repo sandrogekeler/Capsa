@@ -117,3 +117,10 @@ One entry per non-obvious choice. Newest at the bottom.
 **Why:** One script had grown past the 400 lines the checks allow. Modules name what each file uses, so a reader can follow a function to its file. Windows can map `.js` to `text/plain` in the registry, Python reads that map, and a browser refuses to run a module sent as plain text (Django ticket #32041 describes the same failure).
 **Alternatives:** Plain scripts sharing global names: no registry risk, but the lint check reports every name from another file as undefined, and nothing says where a name comes from.
 **Trade-off:** The page no longer works opened as a file (`file://`); it needs a server, which pywebview always starts.
+
+## 2026-11-14: The page resizes the frameless window
+**Decision:** Handles on the page's edges measure a drag and call `Api.resize`, which calls pywebview's `window.resize` with the opposite sides fixed. The window stays frameless.
+**Why:** pywebview's maintainer: "Frameless windows are not resizable" ([discussion #1591](https://github.com/r0x0r/pywebview/discussions/1591)). On Windows pywebview sets `FormBorderStyle.None`, which removes the resize border with the title bar. Sandro chose the frameless window (2026-11-12).
+**Alternatives:** Windows' own hit-testing (`WM_NCHITTEST`) through ctypes: snapping and the native feel, but Windows-only code against pywebview's internals, and WebView2 covers the whole window, so the border would need a gap. The system title bar: undoes Sandro's choice.
+**Trade-off:** One Python call per step of a drag, so resizing may lag behind the pointer. Dragging an edge does not snap the window.
+

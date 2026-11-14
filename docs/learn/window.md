@@ -34,6 +34,7 @@ The window is a small web page shown by Windows' own browser engine, WebView2, t
 | `app.js` | The sidebar, the grid, sorting, the shortcuts. Keeps the assets of the last search. |
 | `details.js` | The details panel and its tags. |
 | `sheet.js` | The settings sheet. After a rescan it sends a `rescanned` event, and `app.js` searches again. |
+| `resize.js` | The handles on the window edges that resize it. |
 | `ui.js` | Pieces the others share: buttons, icons, sizes, the toast, the right-click menu, Copy path, Show in Explorer. |
 
 A browser runs a module only when the server says the file is JavaScript. pywebview's server asks Python's `mimetypes`, which on Windows reads the registry, and some programs set `.js` to plain text there. `open_window` tells `mimetypes` that `.js` is JavaScript before the window opens.
@@ -50,7 +51,7 @@ That line runs `Api.search("metal")` in Python and waits for the answer: a list 
 
 These calls do not go over the network. pywebview does start a small web server on `127.0.0.1` to hand WebView2 the page files; Capsa has no server of its own. The page cannot reach anything `Api` does not offer.
 
-`Api` has seventeen methods: `search`, `thumbnail`, `show_in_explorer`, `set_favourite`, `add_tag`, `remove_tag`, `collections`, `create_collection`, `delete_collection`, `add_to_collection`, `remove_from_collection`, `folders`, `add_folder`, `rescan`, `minimize`, `toggle_maximize` and `close`.
+`Api` has eighteen methods: `search`, `thumbnail`, `show_in_explorer`, `set_favourite`, `add_tag`, `remove_tag`, `collections`, `create_collection`, `delete_collection`, `add_to_collection`, `remove_from_collection`, `folders`, `add_folder`, `rescan`, `minimize`, `toggle_maximize`, `resize` and `close`.
 
 pywebview runs every call in a thread of its own. A scan can take a while, and the window stays usable meanwhile: the page only waits for the answer of `rescan` to hide the scan line and fetch the assets again. Thumbnails that are still loading wait until the scan ends: both make thumbnails, and two threads writing the same file at once would clash. A lock (`threading.Lock`) lets one in at a time.
 
@@ -70,9 +71,18 @@ The page draws the tiles first, then asks for one thumbnail after the other with
 
 The window is **frameless**: Windows draws no title bar, Capsa draws its own. Dragging the empty part of the bar moves the window. That part is a `div` with the class `pywebview-drag-region`, which pywebview watches for. It lies behind the search box and buttons, so clicking those does not move the window.
 
+## Resizing
+
+A frameless window has no border, and pywebview cannot resize one by itself. `resize.js` puts eight invisible handles on the page: a strip 5 px wide along each edge and a 12 px square in each corner. Each shows the matching resize cursor.
+
+Dragging a handle measures how far the pointer moved on the screen, adds that to the window's size when the drag began, and calls `window.pywebview.api.resize(width, height, edge)`. `edge` names the sides that move, such as `"se"` or `"w"`. `Api.resize` keeps the other sides in place: dragging the left edge keeps the right edge where it is. Python stops the window at 720 by 480 px. A maximised window hides the handles and ignores the call.
+
+A drag sends many sizes. While one call is on its way, the page keeps only the newest size and sends that next, so the window never trails behind a queue of old sizes.
+
 ## What it does not do yet
 
 - The scan line shows that a scan runs, not how far it is.
 - Sort, tile size and list or grid are forgotten when the window closes.
 - The font is a placeholder: IBM Plex if installed, otherwise Segoe UI (#12).
 - Maximise is tracked by the button alone: double-clicking the title bar or snapping the window does not update it.
+- Resizing does not snap: dragging the top edge to the top of the screen does not stretch the window to full height.
