@@ -34,7 +34,7 @@ The window is a small web page shown by Windows' own browser engine, WebView2, t
 | `app.js` | The sidebar, the grid, sorting, the shortcuts. Keeps the assets of the last search. |
 | `details.js` | The details panel and its tags. |
 | `sheet.js` | The settings sheet. After a rescan it sends a `rescanned` event, and `app.js` searches again. |
-| `resize.js` | The handles on the window edges that resize it. |
+| `frame.js` | Moving the window by its title bar and resizing it by its edges. |
 | `ui.js` | Pieces the others share: buttons, icons, sizes, the toast, the right-click menu, Copy path, Show in Explorer. |
 
 A browser runs a module only when the server says the file is JavaScript. pywebview's server asks Python's `mimetypes`, which on Windows reads the registry, and some programs set `.js` to plain text there. `open_window` tells `mimetypes` that `.js` is JavaScript before the window opens.
@@ -51,7 +51,7 @@ That line runs `Api.search("metal")` in Python and waits for the answer: a list 
 
 These calls do not go over the network. pywebview does start a small web server on `127.0.0.1` to hand WebView2 the page files; Capsa has no server of its own. The page cannot reach anything `Api` does not offer.
 
-`Api` has eighteen methods: `search`, `thumbnail`, `show_in_explorer`, `set_favourite`, `add_tag`, `remove_tag`, `collections`, `create_collection`, `delete_collection`, `add_to_collection`, `remove_from_collection`, `folders`, `add_folder`, `rescan`, `minimize`, `toggle_maximize`, `resize` and `close`.
+`Api` has twenty methods: `search`, `thumbnail`, `show_in_explorer`, `set_favourite`, `add_tag`, `remove_tag`, `collections`, `create_collection`, `delete_collection`, `add_to_collection`, `remove_from_collection`, `folders`, `add_folder`, `rescan`, `minimize`, `toggle_maximize`, `native_frame`, `begin_drag`, `resize` and `close`.
 
 pywebview runs every call in a thread of its own. A scan can take a while, and the window stays usable meanwhile: the page only waits for the answer of `rescan` to hide the scan line and fetch the assets again. Thumbnails that are still loading wait until the scan ends: both make thumbnails, and two threads writing the same file at once would clash. A lock (`threading.Lock`) lets one in at a time.
 
@@ -67,17 +67,30 @@ Show in Explorer asks Python, because a page cannot start programs. On Windows `
 
 The page draws the tiles first, then asks for one thumbnail after the other with `window.pywebview.api.thumbnail(cover)`. Python makes the thumbnail if the cache does not have it yet, and sends it back as a **data URL**: the JPEG written out as text. The grid appears at once and fills in.
 
-## The title bar
+## The title bar and the edges
 
-The window is **frameless**: Windows draws no title bar, Capsa draws its own. Dragging the empty part of the bar moves the window. That part is a `div` with the class `pywebview-drag-region`, which pywebview watches for. It lies behind the search box and buttons, so clicking those does not move the window.
+The window is **frameless**: Windows draws no title bar and no border, Capsa draws its own title bar. Dragging its empty part moves the window. That part is a `div` with the class `drag`. It lies behind the search box and buttons, so clicking those does not move the window. `frame.js` also puts eight invisible handles on the page for resizing: a strip 5 px wide along each edge and a 12 px square in each corner, each with the matching resize cursor.
 
-## Resizing
+How a drag runs depends on the system. `Api.native_frame()` tells the page which way applies.
 
-A frameless window has no border, and pywebview cannot resize one by itself. `resize.js` puts eight invisible handles on the page: a strip 5 px wide along each edge and a 12 px square in each corner. Each shows the matching resize cursor.
+### On Windows: Windows runs the drag
 
-Dragging a handle measures how far the pointer moved on the screen, adds that to the window's size when the drag began, and calls `window.pywebview.api.resize(width, height, edge)`. `edge` names the sides that move, such as `"se"` or `"w"`. `Api.resize` keeps the other sides in place: dragging the left edge keeps the right edge where it is. Python stops the window at 720 by 480 px. A maximised window hides the handles and ignores the call.
+A normal window's title bar and border tell Windows "the left button went down on my caption" (or "on my left border") with the message `WM_NCLBUTTONDOWN` and a **hit-test code**: 2 for the caption, 10 for the left border, 17 for the bottom-right corner, and so on. Windows then runs the drag itself: an outline or the live contents, as set in Windows, and Snap.
 
-A drag sends many sizes. While one call is on its way, the page keeps only the newest size and sends that next, so the window never trails behind a queue of old sizes.
+Pressing the title bar or a handle calls `Api.begin_drag(part)`, with `part` `"move"` or an edge such as `"se"`. Python sends the window that same message. Two details:
+
+- While the button is down, the page holds the mouse (**mouse capture**). `ReleaseCapture` gives it back first, or Windows' drag could not follow the pointer.
+- Both calls run on the thread that owns the window, through Windows Forms' `Invoke`. pywebview's Windows window is a Windows Forms window, reached as `window.native`.
+
+A quick click can end before the call arrives. Python checks that the button is still down and does nothing otherwise; Windows would start a drag that follows the pointer until the next click.
+
+### Elsewhere: the page runs the drag
+
+Moving: the title bar `div` also has the class `pywebview-drag-region`. pywebview watches it, and on each mouse move tells Python where the window goes. On Windows `frame.js` removes the class.
+
+Resizing: the page measures how far the pointer moved on the screen, adds that to the window's size when the drag began, and calls `Api.resize(width, height, edge)`. `Api.resize` keeps the other sides in place: dragging the left edge keeps the right edge where it is. While one call is on its way, the page keeps only the newest size and sends that next.
+
+Both ways, Python stops the window at 720 by 480 px, and a maximised window hides the handles and ignores the drag.
 
 ## What it does not do yet
 
@@ -85,4 +98,4 @@ A drag sends many sizes. While one call is on its way, the page keeps only the n
 - Sort, tile size and list or grid are forgotten when the window closes.
 - The font is a placeholder: IBM Plex if installed, otherwise Segoe UI (#12).
 - Maximise is tracked by the button alone: double-clicking the title bar or snapping the window does not update it.
-- Resizing does not snap: dragging the top edge to the top of the screen does not stretch the window to full height.
+- On Linux the window moves and resizes step by step and does not snap.

@@ -1,6 +1,8 @@
 import base64
+import ctypes
 import subprocess
 import sys
+import types
 from pathlib import Path
 
 import numpy as np
@@ -72,7 +74,7 @@ def test_page_files_ship_with_the_package():
         "style.css",
         "app.js",
         "details.js",
-        "resize.js",
+        "frame.js",
         "sheet.js",
         "ui.js",
     ):
@@ -221,3 +223,63 @@ def test_maximized_window_is_not_resized():
     api.resize(900, 600, "e")
     assert api.toggle_maximize() is False
     assert api._window.calls == [("maximize",), ("restore",)]
+
+
+class Recorder:
+    """A stand-in for one user32 function: records its calls, answers `result`."""
+
+    def __init__(self, calls, name, result=0):
+        self.calls, self.name, self.result = calls, name, result
+
+    def __call__(self, *args):
+        self.calls.append((self.name, *args))
+        return self.result
+
+
+def fake_windows(monkeypatch, button_down=True):
+    """Stand-ins for user32, .NET's Func and pywebview's Windows Forms window."""
+    calls = []
+    user32 = types.SimpleNamespace(
+        GetSystemMetrics=Recorder(calls, "GetSystemMetrics"),
+        GetAsyncKeyState=Recorder(calls, "GetAsyncKeyState", 0x8000 if button_down else 0),
+        ReleaseCapture=Recorder(calls, "ReleaseCapture"),
+        PostMessageW=Recorder(calls, "PostMessageW"),
+    )
+
+    def cursor(pointer):
+        pointer._obj.x, pointer._obj.y = -5, 300  # a screen left of the main one
+
+    user32.GetCursorPos = cursor
+    monkeypatch.setattr(ctypes, "WinDLL", lambda name: user32, raising=False)
+    system = types.ModuleType("System")
+    system.Type = object
+    system.Func = {object: lambda function: function}
+    monkeypatch.setitem(sys.modules, "System", system)
+    form = types.SimpleNamespace(
+        Handle=types.SimpleNamespace(ToInt64=lambda: 4242), Invoke=lambda function: function()
+    )
+    return calls, types.SimpleNamespace(native=form)
+
+
+def test_begin_drag_sends_windows_the_border_message(monkeypatch):
+    calls, window = fake_windows(monkeypatch)
+    api = Api(Path("unused"))
+    api._window = window
+    api.begin_drag("sw")
+    where = (300 << 16) | (-5 & 0xFFFF)
+    assert calls[-2:] == [("ReleaseCapture",), ("PostMessageW", 4242, 0xA1, 16, where)]
+
+
+def test_begin_drag_after_the_button_is_up_does_nothing(monkeypatch):
+    calls, window = fake_windows(monkeypatch, button_down=False)
+    api = Api(Path("unused"))
+    api._window = window
+    api.begin_drag("move")
+    assert "PostMessageW" not in [call[0] for call in calls]
+
+
+def test_native_frame_only_on_windows(monkeypatch):
+    monkeypatch.setattr(sys, "platform", "linux")
+    assert Api(Path("unused")).native_frame() is False
+    monkeypatch.setattr(sys, "platform", "win32")
+    assert Api(Path("unused")).native_frame() is True

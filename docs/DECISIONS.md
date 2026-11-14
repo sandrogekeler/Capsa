@@ -124,3 +124,9 @@ One entry per non-obvious choice. Newest at the bottom.
 **Alternatives:** Windows' own hit-testing (`WM_NCHITTEST`) through ctypes: snapping and the native feel, but Windows-only code against pywebview's internals, and WebView2 covers the whole window, so the border would need a gap. The system title bar: undoes Sandro's choice.
 **Trade-off:** One Python call per step of a drag, so resizing may lag behind the pointer. Dragging an edge does not snap the window.
 
+## 2026-11-14: Windows runs window drags itself
+**Decision:** On Windows, pressing the title bar or a resize handle calls `Api.begin_drag`, which sends the window `WM_NCLBUTTONDOWN` with the caption or border hit-test code, after `ReleaseCapture`. Elsewhere the page keeps moving and resizing the window step by step. Sandro chose this on a card (2026-11-14). It replaces the page-run drag on Windows from the entry before.
+**Why:** With animations off in Windows, Capsa's window still moved and resized with live contents: pywebview's drag region and the resize handles move the window one step per mouse move, and Windows never sees a drag. Sent the border message, Windows runs the drag with the user's settings and Snap. Tauri's WebView2 layer (wry) starts drags the same way.
+**Alternatives:** Keep the page-run drag: no Windows-only code, but Windows' settings and Snap do not apply. Answer `WM_NCHITTEST` in the window procedure: Windows would find the borders itself, but WebView2 covers the whole window and receives the mouse first.
+**Trade-off:** Windows-only code that reaches pywebview's Windows Forms window (`window.native`) and needs .NET's `Func` through pythonnet. Microsoft documents the border codes for "a resizable window"; whether Windows resizes a borderless window this way is untested until it runs on Sandro's machine.
+

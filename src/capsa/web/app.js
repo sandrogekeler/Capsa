@@ -4,7 +4,7 @@
 
 import { drawDetails } from "./details.js";
 import { openSheet } from "./sheet.js";
-import "./resize.js";
+import "./frame.js";
 import { KINDS, askText, button, closeMenu, copyPath, explore, icon, openMenu, say, size, star } from "./ui.js";
 
 // Sidebar groups: [id, label, kinds]. "All" has no kinds and takes everything.

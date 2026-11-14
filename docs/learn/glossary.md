@@ -40,6 +40,8 @@ Every technical term used in Capsa, in plain language. Alphabetical.
 
 **Linear and sRGB:** two ways to store brightness. Linear stores the amount of light, which is what a renderer computes with. sRGB stores what a screen expects. Showing linear values unconverted looks too dark.
 
+**Hit-test code:** the number Windows uses for a part of a window under the pointer: 2 for the title bar, 10 for the left border and so on. Pressing a part with a code for a border starts a resize.
+
 **Image sequence:** one image per frame, numbered: `caustics_1001.png`, `caustics_1002.png` and so on. Written `caustics_####.png`; Houdini writes `caustics_$F4.png`.
 
 **Lockfile (`uv.lock`):** the exact version of every dependency, written by uv. Like caching a simulation to disk: everybody who opens the project gets the same result, not whatever is newest that day.
@@ -47,6 +49,8 @@ Every technical term used in Capsa, in plain language. Alphabetical.
 **MIME type:** the label a server sends with a file to say what it is, such as `text/javascript` or `image/jpeg`. The browser trusts the label, not the file name.
 
 **Module (JavaScript):** a script that takes pieces from other scripts with `import` and offers its own with `export`. Loaded with `<script type="module">`.
+
+**Mouse capture:** a window keeping all mouse input while a button is down, even when the pointer leaves it. Only one window has it at a time.
 
 **OpenImageIO:** the library that reads and writes image files, the one behind `oiiotool` and `iconvert`. Capsa's first dependency.
 
