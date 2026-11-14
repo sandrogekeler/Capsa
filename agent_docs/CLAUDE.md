@@ -18,9 +18,9 @@ line and a first window. The brief is `docs/BRIEF.md`.
 
 - `src/capsa/`: `scanner.py` lists the files under a library root, `assets.py`
   groups them into assets, `index.py` keeps the assets in SQLite and searches
-  them, `thumbnails.py` makes a preview of an image, `library.py` runs them
-  in order and names the data folder, `window.py` and `web/` are the window,
-  `__main__.py` is the `capsa` command.
+  them, `thumbnails.py` makes a preview of an image and reads its size,
+  `library.py` runs them in order and names the data folder, `window.py` and
+  `web/` are the window, `__main__.py` is the `capsa` command.
 - `tests/`: unit tests. Houdini is not available in Claude's environment; what
   Sandro's machine showed is in issue #11.
 - `docs/`: the brief (`BRIEF.md`), decisions (`DECISIONS.md`), architecture,

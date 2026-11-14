@@ -5,7 +5,7 @@ import numpy as np
 import OpenImageIO as oiio
 import pytest
 
-from capsa.thumbnails import SIZE, make_thumbnail, thumbnail_path
+from capsa.thumbnails import SIZE, image_size, make_thumbnail, thumbnail_path
 
 
 def write_image(path: Path, width: int, height: int, channels: int, value: float) -> Path:
@@ -123,3 +123,13 @@ def test_library_is_left_untouched(library, cache):
     make_thumbnail(library / "b.rat", cache)
     after = {p.name: (p.stat().st_size, p.stat().st_mtime_ns) for p in library.iterdir()}
     assert after == before
+
+
+def test_image_size_reads_the_header(tmp_path: Path):
+    assert image_size(write_image(tmp_path / "sky.exr", 16, 8, 3, 0.5)) == (16, 8)
+
+
+def test_image_size_of_junk_is_none(tmp_path: Path):
+    junk = tmp_path / "junk.exr"
+    junk.write_bytes(b"junk")
+    assert image_size(junk) is None

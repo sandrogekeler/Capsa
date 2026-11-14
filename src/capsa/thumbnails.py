@@ -1,4 +1,4 @@
-"""Make a small preview image of an image file.
+"""Make a small preview image of an image file, and read an image's size.
 
 Reads the source file and writes only into the cache folder it is given.
 """
@@ -60,3 +60,17 @@ def make_thumbnail(source: Path, cache: Path) -> Path | None:
         return None
     os.replace(part, target)
     return target
+
+
+def image_size(source: Path) -> tuple[int, int] | None:
+    """Width and height in pixels, from the file's header alone.
+
+    Returns None when OpenImageIO cannot read the file.
+    """
+    image = oiio.ImageInput.open(str(source))
+    if image is None:
+        log.warning("No size for %s: %s", source, oiio.geterror())
+        return None
+    spec = image.spec()
+    image.close()
+    return spec.width, spec.height

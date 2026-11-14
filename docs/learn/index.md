@@ -31,6 +31,7 @@ Paths are stored relative to the root, so `materials/metal/metal_053B`, not `D:\
 
 - An asset that is new gets a row. Counted as **added**.
 - An asset whose files differ (one more, one fewer, another size or date) gets its files replaced. Counted as **changed**.
+- So does an asset whose files are the same but whose kind or cover changed: a lone `.exr` that turned out to be no HDRI.
 - An asset the index knows but the scan did not find is marked **missing**. Its row stays.
 - Unless its files are still there and now belong to another asset: a folder that became a material, frames that became a sequence. Then the old row is deleted. Counted as **regrouped**.
 - Everything else is left alone.

@@ -1,6 +1,7 @@
 import sqlite3
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -327,3 +328,13 @@ CREATE TABLE files (
 CREATE INDEX files_by_asset ON files (asset_id);
 CREATE VIRTUAL TABLE assets_search USING fts5 (path);
 """
+
+
+def test_new_kind_with_the_same_files_is_saved(index: Index, library: Path):
+    # A grouping rule can change an asset's kind while its files stay as they are.
+    assets = found(library)
+    index.update(library, assets)
+    sky = next(asset for asset in assets if asset.kind == Kind.HDRI)
+    relabelled = [replace(a, kind=Kind.TEXTURE) if a is sky else a for a in assets]
+    assert index.update(library, relabelled) == Changes(added=0, changed=1, missing=0, regrouped=0)
+    assert {a.name: a.kind for a in index.search("")}[sky.name] == Kind.TEXTURE

@@ -201,9 +201,9 @@ class Index:
             "SELECT id FROM roots WHERE path = ?", (str(root),)
         ).fetchone()
         known = {
-            path: (asset_id, missing)
-            for asset_id, path, missing in self._db.execute(
-                "SELECT id, path, missing FROM assets WHERE root_id = ?", (root_id,)
+            path: (asset_id, missing, kind, cover)
+            for asset_id, path, missing, kind, cover in self._db.execute(
+                "SELECT id, path, missing, kind, cover FROM assets WHERE root_id = ?", (root_id,)
             )
         }
         added = changed = 0
@@ -234,8 +234,11 @@ class Index:
                     )
                     added += 1
                 else:
-                    asset_id, was_missing = before
-                    if not was_missing and files == self._files(asset_id):
+                    asset_id, was_missing, kind, old_cover = before
+                    # Unchanged files can still make a new kind or cover when the
+                    # grouping rules change, as when a lone .exr turns out no HDRI.
+                    same = (kind, old_cover) == (asset.kind.value, cover)
+                    if not was_missing and same and files == self._files(asset_id):
                         continue
                     self._db.execute(
                         "UPDATE assets SET kind = ?, cover = ?, missing = 0 WHERE id = ?",
@@ -252,7 +255,7 @@ class Index:
             scanned = {f.path.relative_to(root).as_posix() for a in assets for f in a.files}
             regrouped = [
                 (asset_id,)
-                for asset_id, _ in known.values()
+                for asset_id, *_ in known.values()
                 if any(path in scanned for path, *_ in self._files(asset_id))
             ]
             self._db.executemany("DELETE FROM files WHERE asset_id = ?", regrouped)
@@ -261,7 +264,7 @@ class Index:
             gone = {asset_id for (asset_id,) in regrouped}
             newly_missing = [
                 (asset_id,)
-                for asset_id, missing in known.values()
+                for asset_id, missing, *_ in known.values()
                 if not missing and asset_id not in gone
             ]
             self._db.executemany("UPDATE assets SET missing = 1 WHERE id = ?", newly_missing)

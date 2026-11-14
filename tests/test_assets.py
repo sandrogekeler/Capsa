@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import OpenImageIO as oiio
 import pytest
 
 from capsa.assets import Asset, group
@@ -146,3 +147,15 @@ def test_numbers_with_gaps_stay_single_files(tmp_path: Path):
 def test_two_numbered_files_are_no_sequence(tmp_path: Path):
     found = make(tmp_path, ["avatar/v1.png", "avatar/v2.png"])
     assert len(found) == 2
+
+
+def write_exr(path: Path, width: int, height: int) -> None:
+    image = oiio.ImageBuf(oiio.ImageSpec(width, height, 3, "half"))
+    assert image.write(str(path)), image.geterror()
+
+
+def test_lone_exr_is_an_hdri_only_at_two_to_one(tmp_path: Path):
+    write_exr(tmp_path / "studio_4k.exr", 64, 32)
+    write_exr(tmp_path / "shot010_beauty.exr", 48, 27)  # a render, 16:9
+    kinds = {asset.name: asset.kind for asset in group(scan(tmp_path).files)}
+    assert kinds == {"studio_4k": Kind.HDRI, "shot010_beauty": Kind.TEXTURE}
