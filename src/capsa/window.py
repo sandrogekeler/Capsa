@@ -6,10 +6,12 @@ No web server of our own: pywebview passes the calls between JavaScript and Pyth
 """
 
 import base64
+import ctypes
 import mimetypes
 import subprocess
 import sys
 import threading
+from ctypes import wintypes
 from pathlib import Path
 
 import webview
@@ -21,6 +23,12 @@ from capsa.thumbnails import make_thumbnail
 
 PAGE = Path(__file__).parent / "web" / "index.html"
 MIN_SIZE = (720, 480)  # in logical pixels, as the page measures them
+
+# What Windows' own title bar and borders send when pressed: the message, and the
+# hit-test code naming the part (WinUser.h, documented under WM_NCHITTEST).
+WM_NCLBUTTONDOWN = 0x00A1
+VK_LBUTTON, VK_RBUTTON, SM_SWAPBUTTON = 0x01, 0x02, 23
+HIT_TESTS = {"move": 2, "w": 10, "e": 11, "n": 12, "nw": 13, "ne": 14, "s": 15, "sw": 16, "se": 17}
 
 
 class Api:
@@ -151,6 +159,54 @@ class Api:
             self._window.maximize()
         self._maximized = not self._maximized
         return self._maximized
+
+    def native_frame(self) -> bool:
+        """True where Windows moves and resizes the window (`begin_drag`).
+
+        Elsewhere the page does it: pywebview's drag region and `resize`.
+        """
+        return sys.platform == "win32"
+
+    def begin_drag(self, part: str) -> None:
+        """Let Windows move the window (`part` "move") or resize it from an edge ("n", "se" ...).
+
+        The page calls this when the mouse button goes down on the title bar or an
+        edge handle. Windows then runs the drag as for any window, with the user's
+        settings: outline or live contents, Snap.
+        """
+        if self._maximized:
+            return
+        from System import Func, Type  # .NET, through pythonnet; pywebview loads it on Windows
+
+        # Capsa's own copy of user32, so the argument types set here touch nobody else.
+        user32 = ctypes.WinDLL("user32")
+        user32.PostMessageW.argtypes = [
+            wintypes.HWND,
+            wintypes.UINT,
+            wintypes.WPARAM,
+            wintypes.LPARAM,
+        ]
+        form = self._window.native  # pywebview's Windows Forms window
+        hwnd = form.Handle.ToInt64()
+        cursor = wintypes.POINT()
+        user32.GetCursorPos(ctypes.byref(cursor))
+        # The pointer's screen position packed into one number, x low and y high.
+        where = ((cursor.y & 0xFFFF) << 16) | (cursor.x & 0xFFFF)
+
+        def start() -> None:
+            # A quick click can end before this call arrives. Windows would then start
+            # a drag with the button already up, and the window would follow the
+            # pointer until the next click. GetAsyncKeyState reads the physical
+            # buttons, so a left-handed mouse presses the right one.
+            button = VK_RBUTTON if user32.GetSystemMetrics(SM_SWAPBUTTON) else VK_LBUTTON
+            if not user32.GetAsyncKeyState(button) & 0x8000:
+                return
+            # The page holds the mouse while the button is down. Windows' drag needs it.
+            user32.ReleaseCapture()
+            user32.PostMessageW(hwnd, WM_NCLBUTTONDOWN, HIT_TESTS[part], where)
+
+        # Windows wants both calls from the thread that owns the window.
+        form.Invoke(Func[Type](start))
 
     def resize(self, width: int, height: int, edge: str) -> None:
         """Give the window a new size while the page's edge handle `edge` is dragged.
