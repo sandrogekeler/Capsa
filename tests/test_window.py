@@ -5,10 +5,11 @@ from pathlib import Path
 
 import numpy as np
 import OpenImageIO as oiio
+from webview.window import FixPoint
 
 from capsa.index import Index
 from capsa.library import INDEX_NAME, refresh
-from capsa.window import PAGE, Api
+from capsa.window import MIN_SIZE, PAGE, Api
 
 
 def library_with_one_image(tmp_path: Path) -> Path:
@@ -66,7 +67,15 @@ def test_unreadable_cover_gives_no_thumbnail(tmp_path):
 
 
 def test_page_files_ship_with_the_package():
-    for name in ("index.html", "style.css", "app.js", "details.js", "sheet.js", "ui.js"):
+    for name in (
+        "index.html",
+        "style.css",
+        "app.js",
+        "details.js",
+        "resize.js",
+        "sheet.js",
+        "ui.js",
+    ):
         assert (PAGE.parent / name).is_file()
 
 
@@ -165,3 +174,50 @@ def test_open_window_serves_scripts_as_javascript(monkeypatch, tmp_path):
         assert mimetypes.guess_type("app.js")[0] == "text/javascript"
     finally:
         mimetypes.add_type("text/javascript", ".js")
+
+
+class Window:
+    """Records what Api asks of pywebview's window."""
+
+    def __init__(self) -> None:
+        self.calls = []
+
+    def resize(self, width, height, fixed):
+        self.calls.append(("resize", width, height, fixed))
+
+    def maximize(self):
+        self.calls.append(("maximize",))
+
+    def restore(self):
+        self.calls.append(("restore",))
+
+
+def test_resize_keeps_the_opposite_sides_in_place():
+    api = Api(Path("unused"))
+    api._window = Window()
+    for edge in ("se", "w", "n", "nw", "ne"):
+        api.resize(900, 600, edge)
+    fixed = [call[3] for call in api._window.calls]
+    assert fixed == [
+        FixPoint.NORTH | FixPoint.WEST,
+        FixPoint.NORTH | FixPoint.EAST,
+        FixPoint.SOUTH | FixPoint.WEST,
+        FixPoint.SOUTH | FixPoint.EAST,
+        FixPoint.SOUTH | FixPoint.WEST,
+    ]
+
+
+def test_resize_stops_at_the_minimum_size():
+    api = Api(Path("unused"))
+    api._window = Window()
+    api.resize(100, 2000, "sw")
+    assert api._window.calls[0][1:3] == (MIN_SIZE[0], 2000)
+
+
+def test_maximized_window_is_not_resized():
+    api = Api(Path("unused"))
+    api._window = Window()
+    assert api.toggle_maximize() is True
+    api.resize(900, 600, "e")
+    assert api.toggle_maximize() is False
+    assert api._window.calls == [("maximize",), ("restore",)]

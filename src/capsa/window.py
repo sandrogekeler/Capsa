@@ -13,12 +13,14 @@ import threading
 from pathlib import Path
 
 import webview
+from webview.window import FixPoint
 
 from capsa.index import Index
 from capsa.library import INDEX_NAME, THUMBNAILS_NAME, refresh
 from capsa.thumbnails import make_thumbnail
 
 PAGE = Path(__file__).parent / "web" / "index.html"
+MIN_SIZE = (720, 480)  # in logical pixels, as the page measures them
 
 
 class Api:
@@ -141,12 +143,31 @@ class Api:
     def minimize(self) -> None:
         self._window.minimize()
 
-    def toggle_maximize(self) -> None:
+    def toggle_maximize(self) -> bool:
+        """Maximise or restore the window. Returns whether it is now maximised."""
         if self._maximized:
             self._window.restore()
         else:
             self._window.maximize()
         self._maximized = not self._maximized
+        return self._maximized
+
+    def resize(self, width: int, height: int, edge: str) -> None:
+        """Give the window a new size while the page's edge handle `edge` is dragged.
+
+        `edge` names the sides that move: "n", "se", "w" and so on. The opposite
+        sides stay where they are. pywebview cannot resize a frameless window
+        itself, so the page measures the drag and calls this.
+        """
+        if self._maximized:
+            return
+        # Clamped here, not left to Windows: a window held at its east side would
+        # otherwise move when its width stops shrinking.
+        width = max(int(width), MIN_SIZE[0])
+        height = max(int(height), MIN_SIZE[1])
+        fixed = FixPoint.EAST if "w" in edge else FixPoint.WEST
+        fixed |= FixPoint.SOUTH if "n" in edge else FixPoint.NORTH
+        self._window.resize(width, height, fixed)
 
     def close(self) -> None:
         self._window.destroy()
@@ -167,7 +188,7 @@ def open_window(data: Path) -> None:
         easy_drag=False,
         width=1280,
         height=800,
-        min_size=(720, 480),
+        min_size=MIN_SIZE,
         background_color="#0B0B0C",
     )
     webview.start()
